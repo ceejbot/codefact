@@ -24,6 +24,13 @@ Environment variables set:
 
 I am both extremely lazy and extremely absent-minded. An eight-hour token expiration is far too frequent for me to keep track of this.
 
+## TODO
+
+- Parse any existing `settings.xml` file and update only the parts that need to be updated.
+- Write files for the user's current shell and not for all shells.
+- Double-check the auth token env var for popularity.
+- Support `zsh` even though I don't use it. Heck, how about `elvish` too?
+
 ## LICENSE
 
 This code is licensed via [the Parity Public License.](https://paritylicense.com) This license requires people who build on top of this source code to share their work with the community, too. See the license text for details.
