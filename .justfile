@@ -1,0 +1,36 @@
+
+_help:
+	just -l
+
+# Run all tests using nextest.
+test:
+	cargo nextest run
+
+# Run the same checks we run in CI. Requires nightly.
+ci: test
+	cargo clippy
+	cargo +nightly fmt
+
+# Ask for clippy's opinion.
+lint:
+	cargo clippy --fix
+	cargo +nightly fmt
+
+# Install required tools
+setup:
+	brew tap ceejbot/tap
+	brew install fzf tomato semver-bump cargo-nextest
+	rustup install nightly
+
+# Tag a new version for release.
+tag BUMP:
+	#!/usr/bin/env bash
+	set -e
+	current=$(tomato get package.version Cargo.toml)
+	version=$(semver-bump {{BUMP}} $current)
+	tomato set package.version "$version" Cargo.toml
+	# update the lock file
+	cargo check
+	git commit Cargo.toml Cargo.lock -m "v${version}"
+	git tag "${version}"
+	echo "Release tagged for version ${version}"

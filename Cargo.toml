@@ -1,0 +1,17 @@
+[package]
+name = "codefact"
+version = "0.1.0"
+edition = "2024"
+authors = ["C J Silverio <ceejceej@gmail.com>"]
+license = "Parity-7.0.0"
+readme = "README.md"
+repository = "https://github.com/ceejbot/codefact"
+
+[dependencies]
+anyhow = "1.0.97"
+aws-config = "1.6.1"
+aws-sdk-codeartifact = "1.67.0"
+aws-sdk-sts = { version = "1.65.0", features = ["behavior-version-latest"] }
+home = "0.5.11"
+jiff = "0.2.6"
+tokio = { version = "1.44.2", features = ["full"] }
