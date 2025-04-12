@@ -1,11 +1,13 @@
 [package]
 name = "codefact"
-version = "0.1.0"
+description = "a command-line tool for keeping a fresh CodeArtifact auth token"
+version = "1.0.0"
 edition = "2024"
 authors = ["C J Silverio <ceejceej@gmail.com>"]
 license = "Parity-7.0.0"
 readme = "README.md"
 repository = "https://github.com/ceejbot/codefact"
+homepage = "https://github.com/ceejbot/codefact"
 
 [dependencies]
 anyhow = "1.0.97"
@@ -14,4 +16,19 @@ aws-sdk-codeartifact = "1.67.0"
 aws-sdk-sts = { version = "1.65.0", features = ["behavior-version-latest"] }
 home = "0.5.11"
 jiff = "0.2.6"
+regex = "1.11.1"
 tokio = { version = "1.44.2", features = ["full"] }
+
+[lints.rust]
+unsafe_code = { level = "deny", priority = 1 }
+future_incompatible = { level = "deny", priority = 2 }
+trivial_casts = { level = "warn", priority = 3 }
+rust_2018_idioms = { level = "warn", priority = 4 }
+
+[lints.clippy]
+unwrap_used = "deny"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

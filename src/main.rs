@@ -8,50 +8,54 @@
 //! It uses whatever aws profile you have set up as your default.
 
 use std::env;
-use std::fs::File;
-use std::io::Write;
+use std::io::Read as _;
+use std::path::PathBuf;
 use std::process::{Command, exit};
 
 use aws_config::BehaviorVersion;
+use regex::Captures;
 
-const MAVEN_TMPL: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="no"?><settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
-    <servers>
-        <server>
-            <id>{domain}</id>
-            <username>aws</username>
-            <password>{token}</token><!--AWS_CODEARTIFACT_TOKEN-->
-        </server>
-    </servers>
-
-    <profiles>
-        <profile>
-            <id>{domain}</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <repositories>
-                <repository>
-                    <id>{domain}</id>
-                    <name>{domain}</name>
-                    <url>https://{domain}-{account_id}.d.codeartifact.{region}.amazonaws.com/maven/{repository}/</url>
-                </repository>
-            </repositories>
-        </profile>
-    </profiles>
-</settings>
-"#;
+const MAVEN_TMPL: &str = include_str!("../templates/maven.full.xml");
 
 const FISH_FILE: &str = "codeartifact.fish";
-const FISH_TMPL: &str = r#"set -gx UV_DEFAULT_INDEX "https://aws:{token}@{domain}-677637302876.d.codeartifact.{region}.amazonaws.com/pypi/{repository}/simple/"
-set -gx UV_PUBLISH_URL "https://{domain}-677637302876.d.codeartifact.{region}.amazonaws.com/pypi/{repository}"
-set -gx UV_PUBLISH_PASSWORD "{token}"
-"#;
+const FISH_FULL: &str = include_str!("../templates/full.fish");
+const FISH_SHORT: &str = include_str!("../templates/short.fish");
 
 const BASH_FILE: &str = ".codeartifact.sh";
-const BASH_TMPL: &str = r#"export UV_DEFAULT_INDEX="https://aws:{token}@{domain}-677637302876.d.codeartifact.{region}.amazonaws.com/pypi/{repository}/simple/"
-export UV_PUBLISH_URL="https://{domain}-677637302876.d.codeartifact.{region}.amazonaws.com/pypi/{repository}"
-export UV_PUBLISH_PASSWORD="{token}"
-"#;
+const BASH_FULL: &str = include_str!("../templates/full.bash");
+const BASH_SHORT: &str = include_str!("../templates/short.bash");
+
+/// Our overengineered struct for holding our env vars.
+#[derive(Debug, Clone)]
+struct EnvVars {
+    homedir: PathBuf,
+    domain: String,
+    account_id: String,
+    region: String,
+    python: Option<String>,
+    maven: Option<String>,
+}
+
+impl EnvVars {
+    pub fn new() -> anyhow::Result<Self> {
+        let homedir = home::home_dir().expect("Cannot locate a home directory to write files to.");
+        let domain = env::var("AWS_DOMAIN").expect("you must set your CodeArtifact domain in the env var AWS_DOMAIN");
+        let account_id =
+            env::var("AWS_ACCOUNT_ID").expect("you must set your numeric AWS account id in the env var AWS_ACCOUNT_ID");
+        let region = env::var("AWS_REGION").unwrap_or("us-east-1".to_string());
+        let python = env::var("CODEARTIFACT_PYTHON_REPO").ok();
+        let maven = env::var("CODEARTIFACT_MAVEN_REPO").ok();
+
+        Ok(Self {
+            homedir,
+            domain,
+            account_id,
+            region,
+            python,
+            maven,
+        })
+    }
+}
 
 fn refresh_credentials() -> anyhow::Result<()> {
     // Maybe our credentials are stale? Let's try refreshing them.
@@ -66,11 +70,7 @@ fn refresh_credentials() -> anyhow::Result<()> {
 
 /// Fetch a fresh auth token and write it out to the various files it needs to be in.
 async fn fetch_token() -> anyhow::Result<()> {
-    let domain = env::var("AWS_DOMAIN").expect("you must set your CodeArtifact domain in the env var AWS_DOMAIN");
-    let account_id =
-        env::var("AWS_ACCOUNT_ID").expect("you must set your numeric AWS account id in the env var AWS_ACCOUNT_ID");
-    let region = env::var("AWS_REGION").unwrap_or("us-east-1".to_string());
-
+    let envvars = EnvVars::new()?;
     let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
     let sts_client = aws_sdk_sts::Client::new(&config);
 
@@ -82,8 +82,8 @@ async fn fetch_token() -> anyhow::Result<()> {
     let client = aws_sdk_codeartifact::Client::new(&config);
     let token_result = client
         .get_authorization_token()
-        .domain(domain.as_str())
-        .domain_owner(account_id.as_str())
+        .domain(envvars.domain.as_str())
+        .domain_owner(envvars.account_id.as_str())
         .send()
         .await;
 
@@ -93,8 +93,8 @@ async fn fetch_token() -> anyhow::Result<()> {
             eprintln!("Got the following error trying to access your repository:");
             eprintln!("{token_err}");
             eprintln!("Please double-check your configuration:");
-            eprintln!("    AWS_DOMAIN={domain}");
-            eprintln!("    AWS_ACCOUNT_ID={account_id}");
+            eprintln!("    AWS_DOMAIN={}", envvars.domain);
+            eprintln!("    AWS_ACCOUNT_ID={}", envvars.account_id);
             exit(1);
         }
     };
@@ -105,77 +105,105 @@ async fn fetch_token() -> anyhow::Result<()> {
     let expiry_dt = token_output
         .expiration()
         .expect("AWS failed to respond with a token expiration time.");
-    let expiry_ms = expiry_dt.to_millis()?;
+    let expiry_ms = format!("{}", expiry_dt.to_millis()?);
 
-    let homedir = home::home_dir().expect("Cannot locate a home directory to write files to.");
-    let mut bashpath = homedir.clone();
-    bashpath.push(BASH_FILE);
-    std::fs::write(
-        &bashpath,
-        format!(
-            r#"export AWS_CODEARTIFACT_TOKEN="{token}"
-export CODEARTIFACT_TOKEN_EXPIRY={expiry_ms}
-"#
-        ),
-    )?;
-
-    let mut fishpath = homedir.clone();
-    fishpath.push(".config/fish/");
-    std::fs::create_dir_all(&fishpath)?;
-    fishpath.push(FISH_FILE);
-    std::fs::write(
-        &fishpath,
-        format!(
-            r#"set -gx AWS_CODEARTIFACT_TOKEN "{token}"
-set -gx CODEARTIFACT_TOKEN_EXPIRY={expiry_ms}
-"#
-        ),
-    )?;
-
-    // We want python setup too.
-    if let Ok(python_repo) = env::var("CODEARTIFACT_PYTHON_REPO") {
-        let mut bashfile = File::options().append(true).open(bashpath)?;
-        write!(
-            bashfile,
-            "{}",
-            BASH_TMPL
-                .replace("{domain}", domain.as_str())
-                .replace("{account_id}", account_id.as_str())
-                .replace("{region}", region.as_str())
-                .replace("{token}", token)
-                .replace("{repository}", python_repo.as_str())
-        )?;
-
-        let mut fishfile = File::options().append(true).open(fishpath)?;
-        write!(
-            fishfile,
-            "{}",
-            FISH_TMPL
-                .replace("{domain}", domain.as_str())
-                .replace("{account_id}", account_id.as_str())
-                .replace("{region}", region.as_str())
-                .replace("{token}", token)
-                .replace("{repository}", python_repo.as_str())
-        )?;
+    maybe_write_maven(&envvars, token)?;
+    let shell = env::var("SHELL").unwrap_or("bash".to_string());
+    if shell.ends_with("fish") {
+        write_fish(&envvars, token, expiry_ms.as_str())
+    } else {
+        write_bash(&envvars, token, expiry_ms.as_str())
     }
+}
 
-    if let Ok(maven_repo) = env::var("CODEARTIFACT_MAVEN_REPO") {
-        let mut mvnpath = homedir.clone();
-        mvnpath.push(".m2");
-        std::fs::create_dir_all(&mvnpath)?;
-        mvnpath.push("settings.xml");
+const TOKEN_PATTERN: &str = "(<password>)(.+?)(</password><!--AWS_CODEARTIFACT_TOKEN-->)";
+
+fn maybe_write_maven(envvars: &EnvVars, token: &str) -> anyhow::Result<()> {
+    let Some(maven) = envvars.maven.as_ref() else {
+        return Ok(());
+    };
+
+    let mut mvnpath = envvars.homedir.clone();
+    mvnpath.push(".m2");
+    std::fs::create_dir_all(&mvnpath)?;
+    mvnpath.push("settings.xml");
+
+    // We're going to be careful about maven config.
+    if std::fs::exists(&mvnpath)? {
+        // We replace only our pattern.
+        let patt = regex::Regex::new(TOKEN_PATTERN)?;
+        // It's not very long, and we are very lazy.
+        let mut file = std::fs::File::open(&mvnpath)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        // Why parse xml when we can use a regex? I suppose this isn't very overengineered.
+        let result = patt.replace(contents.as_str(), |caps: &Captures<'_>| {
+            format!("{}{token}{}", &caps[1], &caps[3])
+        });
+        std::fs::write(&mvnpath, result.as_bytes())?;
+    } else {
+        // we may cheerfully write all over a file that does not exist.
         std::fs::write(
             &mvnpath,
             MAVEN_TMPL
-                .replace("{domain}", domain.as_str())
-                .replace("{account_id}", account_id.as_str())
-                .replace("{region}", region.as_str())
+                .replace("{domain}", envvars.domain.as_str())
+                .replace("{account_id}", envvars.account_id.as_str())
+                .replace("{region}", envvars.region.as_str())
                 .replace("{token}", token)
-                .replace("{repository}", maven_repo.as_str()),
+                .replace("{repository}", maven),
         )?;
     }
 
     Ok(())
+}
+
+fn write_shell_templates(
+    envvars: &EnvVars,
+    token: &str,
+    expiry_ms: &str,
+    fpath: PathBuf,
+    full: &str,
+    short: &str,
+) -> anyhow::Result<()> {
+    if let Some(python) = envvars.python.as_ref() {
+        std::fs::write(
+            &fpath,
+            full.replace("{domain}", envvars.domain.as_str())
+                .replace("{account_id}", envvars.account_id.as_str())
+                .replace("{region}", envvars.region.as_str())
+                .replace("{token}", token)
+                .replace("{expiry_ms}", expiry_ms)
+                .replace("{repository}", python),
+        )?;
+    } else {
+        std::fs::write(
+            &fpath,
+            short.replace("{token}", token).replace("{expiry_ms}", expiry_ms),
+        )?;
+    }
+    Ok(())
+}
+
+fn write_fish(envvars: &EnvVars, token: &str, expiry_ms: &str) -> anyhow::Result<()> {
+    let mut fishpath = envvars.homedir.clone();
+    fishpath.push(".config/fish/");
+    std::fs::create_dir_all(&fishpath)?;
+    fishpath.push(FISH_FILE);
+    println!(
+        "source {} to get the fresh token in your environment",
+        fishpath.display()
+    );
+    write_shell_templates(envvars, token, expiry_ms, fishpath, FISH_FULL, FISH_SHORT)
+}
+
+fn write_bash(envvars: &EnvVars, token: &str, expiry_ms: &str) -> anyhow::Result<()> {
+    let mut bashpath = envvars.homedir.clone();
+    bashpath.push(BASH_FILE);
+    println!(
+        "source {} to get the fresh token in your environment",
+        bashpath.display()
+    );
+    write_shell_templates(envvars, token, expiry_ms, bashpath, BASH_FULL, BASH_SHORT)
 }
 
 #[tokio::main]

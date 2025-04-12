@@ -10,7 +10,7 @@ Environment variables read:
 * `AWS_ACCOUNT_ID`: the numeric AWS account ID
 * `AWS_REGION`: the AWS region to use in the CodeArtifact repo URI.
 * `CODEARTIFACT_PYTHON_REPO` The name of your python repository, if you use one. Writes `uv`'s config variables for bash and fish shells if set.
-* `CODEARTIFACT_MAVEN_REPO`: The name of your maven repository, if you use one. Writes `~/.m2/settings.xml` if set. ⚠️ *This replaces `settings.xml` entirely right now.* It will do something smarter in the next commit, probably involving parsing the xml. (A goal of this project is to be overengineered.)
+* `CODEARTIFACT_MAVEN_REPO`: The name of your maven repository, if you use one. Writes `~/.m2/settings.xml` if set. It replaces only the password line for the codeartifact repo if the line contains a magic cookie.
 
 Environment variables set:
 
@@ -26,8 +26,8 @@ I am both extremely lazy and extremely absent-minded. An eight-hour token expira
 
 ## TODO
 
-- Parse any existing `settings.xml` file and update only the parts that need to be updated.
-- Write files for the user's current shell and not for all shells.
+- ✅ Parse any existing `settings.xml` file and update only the parts that need to be updated.
+- ✅ Write files for the user's current shell and not for all shells.
 - Double-check the auth token env var for popularity.
 - Support `zsh` even though I don't use it. Heck, how about `elvish` too?
 

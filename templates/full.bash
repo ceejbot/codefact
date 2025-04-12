@@ -1,0 +1,5 @@
+export AWS_CODEARTIFACT_TOKEN="{token}"
+export CODEARTIFACT_TOKEN_EXPIRY="{expiry_ms}"
+export UV_DEFAULT_INDEX="https://aws:{token}@{domain}-{account_id}.d.codeartifact.{region}.amazonaws.com/pypi/{repository}/simple/"
+export UV_PUBLISH_URL="https://{domain}-{account_id}.d.codeartifact.{region}.amazonaws.com/pypi/{repository}"
+export UV_PUBLISH_PASSWORD="{token}"

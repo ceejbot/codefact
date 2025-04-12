@@ -1,0 +1,5 @@
+set -gx AWS_CODEARTIFACT_TOKEN "{token}"
+set -gx CODEARTIFACT_TOKEN_EXPIRY "{expiry_ms}"
+set -gx UV_DEFAULT_INDEX "https://aws:{token}@{domain}-{account_id}.d.codeartifact.{region}.amazonaws.com/pypi/{repository}/simple/"
+set -gx UV_PUBLISH_URL "https://{domain}-{account_id}.d.codeartifact.{region}.amazonaws.com/pypi/{repository}"
+set -gx UV_PUBLISH_PASSWORD "{token}"

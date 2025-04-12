@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <servers>
+        <server>
+            <id>{domain}</id>
+            <username>aws</username>
+            <password>{token}</password><!--AWS_CODEARTIFACT_TOKEN-->
+        </server>
+    </servers>
+
+    <profiles>
+        <profile>
+            <id>{domain}</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <repositories>
+                <repository>
+                    <id>{domain}</id>
+                    <name>{domain}</name>
+                    <url>https://{domain}-{account_id}.d.codeartifact.{region}.amazonaws.com/maven/{repository}/</url>
+                </repository>
+            </repositories>
+        </profile>
+    </profiles>
+</settings>

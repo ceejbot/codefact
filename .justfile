@@ -27,10 +27,9 @@ tag BUMP:
 	#!/usr/bin/env bash
 	set -e
 	current=$(tomato get package.version Cargo.toml)
-	version=$(semver-bump {{BUMP}} $current)
-	tomato set package.version "$version" Cargo.toml
-	# update the lock file
-	cargo check
+	version=$(echo "$current" | semver-bump {{BUMP}})
+	tomato set package.version "$version" Cargo.toml &> /dev/null
+	cargo generate-lockfile
 	git commit Cargo.toml Cargo.lock -m "v${version}"
 	git tag "${version}"
 	echo "Release tagged for version ${version}"
