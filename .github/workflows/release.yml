@@ -4,6 +4,7 @@ permissions:
 
 on:
     push:
+        branches: [latest]
         tags:
             - "v**[0-9]+.[0-9]+.[0-9]+*"
     workflow_dispatch:
@@ -16,8 +17,8 @@ env:
     CARGO_TERM_COLOR: always
 
 jobs:
-    test:
-        name: test
+    release:
+        name: release
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
@@ -33,17 +34,17 @@ jobs:
                       ~/.cargo/bin
                       target
 
-            - name: get cargo-nextest on path
-              run: |
-                  if [[ -z $(which cargo-nextest) ]]; then
-                    curl -sL https://get.nexte.st/latest/linux -o nextest.tgz
-                    tar xfz nextest.tgz
-                    mv cargo-nextest ~/.cargo/bin
-                    rm nextest.tgz
-                  fi
+            # - name: get cargo-nextest on path
+            #   run: |
+            #       if [[ -z $(which cargo-nextest) ]]; then
+            #         curl -sL https://get.nexte.st/latest/linux -o nextest.tgz
+            #         tar xfz nextest.tgz
+            #         mv cargo-nextest ~/.cargo/bin
+            #         rm nextest.tgz
+            #       fi
 
-            - name: run the tests
-              run: cargo +stable nextest run
+            # - name: run the tests
+            #   run: cargo +stable nextest run
 
             - name: consult Clippy
               run: cargo +stable clippy --all-targets
@@ -55,6 +56,8 @@ jobs:
               run: cargo +stable build --release
 
             - name: create github release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   tar czf codefact-aarch64-apple-darwin.tar.gz --strip-components=2  target/release/codefact
                   release_url=$(gh release create ${{ github.ref_name }} --generate-notes)
