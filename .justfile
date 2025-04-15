@@ -31,5 +31,5 @@ tag BUMP:
 	tomato set package.version "$version" Cargo.toml &> /dev/null
 	cargo generate-lockfile
 	git commit Cargo.toml Cargo.lock -m "v${version}"
-	git tag "${version}"
-	echo "Release tagged for version ${version}"
+	git tag "v${version}"
+	echo "Release tagged for version v${version}"
