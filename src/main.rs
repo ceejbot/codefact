@@ -4,15 +4,19 @@
 //! when they're sourced, and to maven when maven does whatever horrors it does to
 //! fetch packages.
 //!
-//! `codefact` at the moment takes no options other than environment variables.
-//! It uses whatever aws profile you have set up as your default.
+//! `codefact` can read its input from environment variables or from a file in
+//! the user's home directory in `toml` format. It uses whatever aws profile you
+//! have set up as your default.
+//!
+//! The tool only prints to stderr, and only if the output is a tty.
 
 use std::env;
-use std::io::Read as _;
+use std::io::{IsTerminal, Read as _};
 use std::path::PathBuf;
 use std::process::{Command, exit};
 
 use aws_config::BehaviorVersion;
+use owo_colors::OwoColorize;
 use regex::Captures;
 
 const MAVEN_TMPL: &str = include_str!("../templates/maven.full.xml");
@@ -24,6 +28,10 @@ const FISH_SHORT: &str = include_str!("../templates/short.fish");
 const BASH_FILE: &str = ".codeartifact.sh";
 const BASH_FULL: &str = include_str!("../templates/full.bash");
 const BASH_SHORT: &str = include_str!("../templates/short.bash");
+
+const TEN_MINUTES_AS_MS: i64 = 10 * 60 * 1000;
+
+// ---------- environment
 
 /// Our overengineered struct for holding our env vars.
 #[derive(Debug, Clone)]
@@ -56,6 +64,8 @@ impl EnvVars {
         })
     }
 }
+
+// ---------- AWS
 
 fn refresh_credentials() -> anyhow::Result<()> {
     // Maybe our credentials are stale? Let's try refreshing them.
@@ -90,7 +100,7 @@ async fn fetch_token() -> anyhow::Result<()> {
     let token_output = match token_result {
         Ok(v) => v,
         Err(token_err) => {
-            eprintln!("Got the following error trying to access your repository:");
+            eprintln!("Got the following error trying to access CodeArtifact:");
             eprintln!("{token_err}");
             eprintln!("Please double-check your configuration:");
             eprintln!("    AWS_DOMAIN={}", envvars.domain);
@@ -110,10 +120,17 @@ async fn fetch_token() -> anyhow::Result<()> {
     maybe_write_maven(&envvars, token)?;
     let shell = env::var("SHELL").unwrap_or("bash".to_string());
     if shell.ends_with("fish") {
-        write_fish(&envvars, token, expiry_ms.as_str())
+        write_fish(&envvars, token, expiry_ms.as_str())?;
     } else {
-        write_bash(&envvars, token, expiry_ms.as_str())
+        write_bash(&envvars, token, expiry_ms.as_str())?;
     }
+
+    // if we're not being run in a terminal, emit the token as our only output to stdout.
+    if !std::io::stdin().is_terminal() {
+        println!("{token}");
+    }
+
+    Ok(())
 }
 
 const TOKEN_PATTERN: &str = "(<password>)(.+?)(</password><!--AWS_CODEARTIFACT_TOKEN-->)";
@@ -189,26 +206,35 @@ fn write_fish(envvars: &EnvVars, token: &str, expiry_ms: &str) -> anyhow::Result
     fishpath.push(".config/fish/");
     std::fs::create_dir_all(&fishpath)?;
     fishpath.push(FISH_FILE);
-    println!(
-        "source {} to get the fresh token in your environment",
-        fishpath.display()
-    );
+    if std::io::stdin().is_terminal() {
+        let instruction = format!("source {}", fishpath.display());
+        eprintln!(
+            "\n{} to update your environment",
+            instruction.blue()
+        );
+    }
     write_shell_templates(envvars, token, expiry_ms, fishpath, FISH_FULL, FISH_SHORT)
 }
 
 fn write_bash(envvars: &EnvVars, token: &str, expiry_ms: &str) -> anyhow::Result<()> {
     let mut bashpath = envvars.homedir.clone();
     bashpath.push(BASH_FILE);
-    println!(
-        "source {} to get the fresh token in your environment",
-        bashpath.display()
-    );
+    if std::io::stdin().is_terminal() {
+        let instruction = format!("source {}", bashpath.display());
+        eprintln!(
+            "\n{} to update your environment",
+            instruction.blue()
+        );
+    }
     write_shell_templates(envvars, token, expiry_ms, bashpath, BASH_FULL, BASH_SHORT)
 }
 
+// ---------- main at the bottom, as is tradition and how C had to do it
+
+/// Check if our token has expired, and if so, fetch a new one.
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let Ok(_token) = env::var("AWS_CODEARTIFACT_TOKEN") else {
+    let Ok(token) = env::var("AWS_CODEARTIFACT_TOKEN") else {
         return fetch_token().await;
     };
     let Ok(expiry_str) = env::var("CODEARTIFACT_TOKEN_EXPIRY") else {
@@ -219,11 +245,13 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let now = jiff::Timestamp::now().as_millisecond();
-    if now > expiry {
+    if now > expiry - TEN_MINUTES_AS_MS {
         // consider testing the token here
         fetch_token().await
     } else {
-        eprintln!("Your token is probably good.");
+        if !std::io::stdin().is_terminal() {
+            println!("{token}");
+        }
         Ok(())
     }
 }

@@ -33,3 +33,9 @@ tag BUMP:
 	git commit Cargo.toml Cargo.lock -m "v${version}"
 	git tag "v${version}"
 	echo "Release tagged for version v${version}"
+
+# Try out the not-in-tty echo
+tryit:
+	#!/usr/bin/env bash
+	token=$(~/.bin/codefact)
+	echo "got $token"
