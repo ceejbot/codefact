@@ -208,10 +208,7 @@ fn write_fish(envvars: &EnvVars, token: &str, expiry_ms: &str) -> anyhow::Result
     fishpath.push(FISH_FILE);
     if std::io::stdin().is_terminal() {
         let instruction = format!("source {}", fishpath.display());
-        eprintln!(
-            "\n{} to update your environment",
-            instruction.blue()
-        );
+        eprintln!("\n{} to update your environment", instruction.blue());
     }
     write_shell_templates(envvars, token, expiry_ms, fishpath, FISH_FULL, FISH_SHORT)
 }
@@ -221,10 +218,7 @@ fn write_bash(envvars: &EnvVars, token: &str, expiry_ms: &str) -> anyhow::Result
     bashpath.push(BASH_FILE);
     if std::io::stdin().is_terminal() {
         let instruction = format!("source {}", bashpath.display());
-        eprintln!(
-            "\n{} to update your environment",
-            instruction.blue()
-        );
+        eprintln!("\n{} to update your environment", instruction.blue());
     }
     write_shell_templates(envvars, token, expiry_ms, bashpath, BASH_FULL, BASH_SHORT)
 }
