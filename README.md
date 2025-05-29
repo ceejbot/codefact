@@ -20,6 +20,8 @@ Environment variables set:
 * `UV_PUBLISH_URL`: for `uv`'s use, if you have set a python repo name
 * `UV_PUBLISH_PASSWORD`: for `uv`'s use, if you have set a python repo name
 
+If you run it in an interactive context (aka a tty), it prints to stderr either the remaining time before an existing token expires, or instructions for how to load a new token into your environemtn. If you run it in a non-interactive context, it prints a good token to stdout and nothing to stderr. This makes it suitable for use in shell scripts, should you have such an odd use case. Perhaps you are me?
+
 ## Rationale
 
 I am both extremely lazy and extremely absent-minded. An eight-hour token expiration is far too frequent for me to keep track of this.

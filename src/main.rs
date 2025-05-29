@@ -16,6 +16,8 @@ use std::path::PathBuf;
 use std::process::{Command, exit};
 
 use aws_config::BehaviorVersion;
+use humanize_duration::Truncate;
+use humanize_duration::prelude::DurationExt;
 use owo_colors::OwoColorize;
 use regex::Captures;
 
@@ -62,6 +64,20 @@ impl EnvVars {
             python,
             maven,
         })
+    }
+}
+
+/// Print to stderr if we're a terminal.
+fn emit_if_tty(msg: &str) {
+    if std::io::stdout().is_terminal() {
+        eprintln!("{msg}");
+    }
+}
+
+/// Print to stdout if we are not a terminal.
+fn emit_if_not_tty(msg: &str) {
+    if !std::io::stdout().is_terminal() {
+        println!("{msg}");
     }
 }
 
@@ -126,9 +142,7 @@ async fn fetch_token() -> anyhow::Result<()> {
     }
 
     // if we're not being run in a terminal, emit the token as our only output to stdout.
-    if !std::io::stdin().is_terminal() {
-        println!("{token}");
-    }
+    emit_if_not_tty(token);
 
     Ok(())
 }
@@ -223,7 +237,7 @@ fn write_bash(envvars: &EnvVars, token: &str, expiry_ms: &str) -> anyhow::Result
     write_shell_templates(envvars, token, expiry_ms, bashpath, BASH_FULL, BASH_SHORT)
 }
 
-// ---------- main at the bottom, as is tradition and how C had to do it
+// ---------- main at the bottom, as C had to do it, which makes it tradition.
 
 /// Check if our token has expired, and if so, fetch a new one.
 #[tokio::main]
@@ -240,12 +254,14 @@ async fn main() -> anyhow::Result<()> {
 
     let now = jiff::Timestamp::now().as_millisecond();
     if now > expiry - TEN_MINUTES_AS_MS {
-        // consider testing the token here
-        fetch_token().await
-    } else {
-        if !std::io::stdin().is_terminal() {
-            println!("{token}");
-        }
-        Ok(())
+        return fetch_token().await;
     }
+
+    let duration = std::time::Duration::from_millis((expiry - now).unsigned_abs());
+    let human_diff = duration.human(Truncate::Minute);
+
+    emit_if_tty(format!("\nYour CodeArtifact token will expire in {}.\n", human_diff.yellow()).as_str());
+    emit_if_not_tty(token.as_str());
+
+    Ok(())
 }
