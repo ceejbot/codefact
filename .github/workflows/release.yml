@@ -64,7 +64,7 @@ jobs:
             #       gh release upload ${{ github.ref_name }} codefact-aarch64-apple-darwin.tar.gz
             #       gh release edit ${{ github.ref_name }} --draft=false
             - name: Release project to Homebrew tap
-              uses: Justintime50/homebrew-releaser@v2
+              uses: ceejbot/homebrew-releaser@main
               with:
                 homebrew_owner: ceejbot
                 homebrew_tap: homebrew-tap
