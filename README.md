@@ -2,6 +2,12 @@
 
 This is a small, over-engineered Rust command-line tool for keeping you logged into AWS CodeArtifact, with a fresh auth token in your environment. It writes some shell files for you to source for this purpose. It is another tool in a long series of tools that solve extremely specific problems that nobody else has.
 
+## Rationale
+
+I am both extremely lazy and extremely absent-minded. An eight-hour token expiration is far too frequent for me to keep track of.
+
+## Usage
+
 `codefact`'s only configuration is through environment variables. You tell your shell how you use CodeArtifact and AWS through some standard variables, and the tool consumes them. If you provide the optional python and maven repo names, the tool writes out configuration for using those repos with `uv` and `mvn` respectively.
 
 Environment variables read:
@@ -22,17 +28,10 @@ Environment variables set:
 
 If you run it in an interactive context (aka a tty), it prints to stderr either the remaining time before an existing token expires, or instructions for how to load a new token into your environemtn. If you run it in a non-interactive context, it prints a good token to stdout and nothing to stderr. This makes it suitable for use in shell scripts, should you have such an odd use case. Perhaps you are me?
 
-## Rationale
-
-I am both extremely lazy and extremely absent-minded. An eight-hour token expiration is far too frequent for me to keep track of this.
-
 ## TODO
 
-- ✅ Parse any existing `settings.xml` file and update only the parts that need to be updated.
-- ✅ Write files for the user's current shell and not for all shells.
-- Double-check the auth token env var for popularity.
 - Support `zsh` even though I don't use it. Heck, how about `elvish` too?
 
 ## LICENSE
 
-This code is licensed via [the Parity Public License.](https://paritylicense.com) This license requires people who build on top of this source code to share their work with the community, too. See the license text for details.
+This code is licensed via [the Parity Public License.](https://paritylicense.com) This license requires people and companies who build on top of this source code to share their work with the community, too. See the license text for details.

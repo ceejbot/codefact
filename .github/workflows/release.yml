@@ -21,88 +21,10 @@ jobs:
         name: release
         runs-on: ubuntu-latest
         steps:
-            # - uses: actions/checkout@v4
-
-            # - name: get stable + nightly Rust
-            #   uses: actions-rust-lang/setup-rust-toolchain@v1
-            #   with:
-            #       toolchain: nightly, stable
-            #       components: clippy, rustfmt
-            #       cache-key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
-            #       cache-directories: |
-            #           ~/.cargo/registry
-            #           ~/.cargo/bin
-            #           target
-
-            # # - name: get cargo-nextest on path
-            # #   run: |
-            # #       if [[ -z $(which cargo-nextest) ]]; then
-            # #         curl -sL https://get.nexte.st/latest/linux -o nextest.tgz
-            # #         tar xfz nextest.tgz
-            # #         mv cargo-nextest ~/.cargo/bin
-            # #         rm nextest.tgz
-            # #       fi
-
-            # # - name: run the tests
-            # #   run: cargo +stable nextest run
-
-            # - name: consult Clippy
-            #   run: cargo +stable clippy --all-targets
-
-            # - name: check formatting
-            #   run: cargo +nightly fmt --check --all
-
-            # - name: build for release
-            #   run: cargo +stable build --release
-
-            # - name: create github release
-            #   env:
-            #       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            #   run: |
-            #       tar czf codefact-aarch64-apple-darwin.tar.gz --strip-components=2  target/release/codefact
-            #       release_url=$(gh release create ${{ github.ref_name }} --generate-notes)
-            #       gh release upload ${{ github.ref_name }} codefact-aarch64-apple-darwin.tar.gz
-            #       gh release edit ${{ github.ref_name }} --draft=false
-            - name: Release project to Homebrew tap
-              uses: ceejbot/homebrew-releaser@main
+            - uses: ceejbot/actions-rust-releaser@latest
               with:
-                homebrew_owner: ceejbot
-                homebrew_tap: homebrew-tap
-                formula_folder: Formula
-                github_token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-                commit_owner: C J Silverio
-                commit_email: ceejceej@gmail.com
-
-                # Install command for your formula.
-                # Required - string
-                install: 'bin.install "codefact" => "codefact"'
-                # Adds URL and checksum targets for different OS and architecture pairs. Using this option assumes
-                # a tar archive exists on your GitHub repo with the following URL pattern (this cannot be customized):
-                # https://github.com/{GITHUB_OWNER}/{REPO_NAME}/releases/download/{TAG}/{REPO_NAME}-{VERSION}-{OPERATING_SYSTEM}-{ARCHITECTURE}.tar.gz'
-                # Darwin AMD pre-existing path example: https://github.com/justintime50/myrepo/releases/download/v1.2.0/myrepo-1.2.0-darwin-amd64.tar.gz
-                # Linux ARM pre-existing path example: https://github.com/justintime50/myrepo/releases/download/v1.2.0/myrepo-1.2.0-linux-arm64.tar.gz
-                # Optional - booleans
-                target_darwin_amd64: false
-                target_darwin_arm64: true
-                target_linux_amd64: false
-                target_linux_arm64: false
-
-                # Update your homebrew tap's README with a table of all projects in the tap.
-                # This is done by pulling the information from all your formula.rb files - eg:
-                #
-                # | Project                                    | Description  | Install                  |
-                # | ------------------------------------------ | ------------ | ------------------------ |
-                # | [formula_1](https://github.com/user/repo1) | helpful text | `brew install formula_1` |
-                # | [formula_2](https://github.com/user/repo2) | helpful text | `brew install formula_2` |
-                # | [formula_3](https://github.com/user/repo3) | helpful text | `brew install formula_3` |
-                #
-                # Place the following in your README or wrap your project's table in these comment tags:
-                # <!-- project_table_start -->
-                # TABLE HERE
-                # <!-- project_table_end -->
-                update_readme_table: true
-
-                # Skips committing the generated formula to a homebrew tap (useful to verify results on a first run).
-                # Default is shown - boolean
-                skip_commit: false
-                debug: false
+                  executable: codefact
+                  refname: ${{ github.ref_name }}
+                  tap_repo: ceejbot/homebrew-tap
+                  tap_email: ceejceej@gmail.com
+                  tap_user: formula robot
